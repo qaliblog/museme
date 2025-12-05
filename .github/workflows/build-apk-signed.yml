@@ -1,0 +1,100 @@
+name: Build Signed Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      keystore_base64:
+        description: 'Base64 encoded keystore file'
+        required: true
+      keystore_password:
+        description: 'Keystore password'
+        required: true
+        type: password
+      key_alias:
+        description: 'Key alias'
+        required: true
+      key_password:
+        description: 'Key password'
+        required: true
+        type: password
+
+jobs:
+  build-signed:
+    name: Build Signed Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Decode keystore
+        run: |
+          echo "${{ github.event.inputs.keystore_base64 }}" | base64 -d > android/app/my-release-key.keystore
+
+      - name: Create signing properties
+        run: |
+          mkdir -p android/app
+          cat > android/app/release-signing.properties << EOF
+          MYAPP_RELEASE_STORE_FILE=my-release-key.keystore
+          MYAPP_RELEASE_KEY_ALIAS=${{ github.event.inputs.key_alias }}
+          MYAPP_RELEASE_STORE_PASSWORD=${{ github.event.inputs.keystore_password }}
+          MYAPP_RELEASE_KEY_PASSWORD=${{ github.event.inputs.key_password }}
+          EOF
+
+      - name: Update build.gradle for signing
+        run: |
+          if ! grep -q "signingConfigs" android/app/build.gradle; then
+            # This is a template - you'll need to manually configure signing in build.gradle
+            echo "Please configure signing in android/app/build.gradle"
+          fi
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            android/.gradle
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Make gradlew executable
+        working-directory: android
+        run: chmod +x gradlew
+
+      - name: Build Signed Release APK
+        working-directory: android
+        run: ./gradlew assembleRelease
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-signed-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
+
+      - name: Clean up keystore
+        if: always()
+        run: rm -f android/app/my-release-key.keystore android/app/release-signing.properties
