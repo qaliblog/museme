@@ -34,14 +34,19 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Initialize React Native Android project
+      - name: Initialize Android project if missing
         run: |
           if [ ! -d "android" ]; then
             echo "Android directory not found. Initializing React Native Android project..."
-            npx react-native init TempProject --skip-install --template react-native-template-typescript
-            cp -r TempProject/android .
-            cp TempProject/android/gradle.properties android/ 2>/dev/null || true
-            rm -rf TempProject
+            # Create a temporary React Native project to get the android folder
+            npx --yes react-native@0.73.0 init TempRNProject --skip-install --template react-native-template-typescript
+            # Copy android folder
+            cp -r TempRNProject/android .
+            # Update app name in strings.xml
+            sed -i 's/TempRNProject/Museme/g' android/app/src/main/res/values/strings.xml 2>/dev/null || true
+            # Clean up
+            rm -rf TempRNProject
+            echo "Android project initialized."
           else
             echo "Android directory already exists."
           fi
