@@ -38,15 +38,22 @@ jobs:
         run: |
           if [ ! -d "android" ]; then
             echo "Android directory not found. Initializing React Native Android project..."
-            # Create a temporary React Native project to get the android folder
-            npx --yes react-native@0.73.0 init TempRNProject --skip-install --template react-native-template-typescript
+            # Use React Native CLI to create a temporary project
+            npx --yes @react-native-community/cli@latest init TempRNProject --skip-install --version 0.73.0
             # Copy android folder
-            cp -r TempRNProject/android .
-            # Update app name in strings.xml
-            sed -i 's/TempRNProject/Museme/g' android/app/src/main/res/values/strings.xml 2>/dev/null || true
+            if [ -d "TempRNProject/android" ]; then
+              cp -r TempRNProject/android .
+              # Update app name in strings.xml if it exists
+              if [ -f "android/app/src/main/res/values/strings.xml" ]; then
+                sed -i 's/TempRNProject/Museme/g' android/app/src/main/res/values/strings.xml
+              fi
+              echo "Android project initialized successfully."
+            else
+              echo "Error: Failed to create Android project structure"
+              exit 1
+            fi
             # Clean up
             rm -rf TempRNProject
-            echo "Android project initialized."
           else
             echo "Android directory already exists."
           fi
