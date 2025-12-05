@@ -94,8 +94,13 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Make gradlew executable
-        working-directory: android
-        run: chmod +x gradlew
+        run: |
+          if [ -d "android" ] && [ -f "android/gradlew" ]; then
+            chmod +x android/gradlew
+          else
+            echo "Error: android/gradlew not found. Android project may not be initialized correctly."
+            exit 1
+          fi
 
       - name: Build Signed Release APK
         working-directory: android
